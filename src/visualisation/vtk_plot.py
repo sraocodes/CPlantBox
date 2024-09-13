@@ -12,6 +12,125 @@ VTK Plot, by Daniel Leitner (refurbished 06/2020)
 to make interactive vtk plot of root systems and soil grids
 """
 
+def plot_plant_2d(plant):
+    """
+    Creates a 2D visualization of a plant using VTK.
+
+    This function provides a simplified 2D representation of a plant,
+    with distinct colors for roots (brown), stem (yellow), and leaves (green).
+    It creates a fixed 2D view of the plant structure.
+
+    Args:
+        plant: A Plant object from the CPlantBox library.
+
+    Returns:
+        None. The function creates and displays a VTK render window.
+
+    Note:
+        This is a simplified version of plant visualization, focusing on 2D representation.
+        It uses a fixed color scheme and disables mouse interactions for a static view.
+
+    Author: Sathyanarayan Rao
+    """
+    # Create a renderer, render window, and interactor
+    renderer = vtk.vtkRenderer()
+    renderWindow = vtk.vtkRenderWindow()
+    renderWindow.AddRenderer(renderer)
+    renderWindow.SetSize(800, 600)
+    interactor = vtk.vtkRenderWindowInteractor()
+    interactor.SetRenderWindow(renderWindow)
+
+    # Set background color to white
+    renderer.SetBackground(1, 1, 1)
+
+    # Define colors for each organ type
+    organ_colors = {
+        2: (0.55, 0.27, 0.07),  # Brown for roots
+        3: (1.0, 1.0, 0.0),     # Yellow for stem
+        4: (0.0, 0.8, 0.0)      # Green for leaves
+    }
+
+    # Variables to track the bounds of the plant
+    x_min, x_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Create actors for each organ
+    for organ in plant.getOrgans():
+        organ_type = int(organ.getParameter("organType"))
+        
+        points = vtk.vtkPoints()
+        lines = vtk.vtkCellArray()
+        
+        # Add points and create lines
+        for i, node in enumerate(organ.getNodes()):
+            x, z = node.x, node.z
+            points.InsertNextPoint(x, z, 0)  # Use x and z for 2D, set y to 0
+            if i > 0:
+                line = vtk.vtkLine()
+                line.GetPointIds().SetId(0, i-1)
+                line.GetPointIds().SetId(1, i)
+                lines.InsertNextCell(line)
+            
+            # Update bounds
+            x_min, x_max = min(x_min, x), max(x_max, x)
+            z_min, z_max = min(z_min, z), max(z_max, z)
+
+        # Create a polydata object
+        polyData = vtk.vtkPolyData()
+        polyData.SetPoints(points)
+        polyData.SetLines(lines)
+
+        # Create a mapper and actor
+        mapper = vtk.vtkPolyDataMapper()
+        mapper.SetInputData(polyData)
+        
+        actor = vtk.vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor(organ_colors.get(organ_type, (0.5, 0.5, 0.5)))  # Default to gray if type not found
+        actor.GetProperty().SetLineWidth(2)
+        
+        renderer.AddActor(actor)
+
+    # Add a legend
+    legend = vtk.vtkLegendBoxActor()
+    legend.SetNumberOfEntries(3)
+    legend.SetEntry(0, vtk.vtkPolyData(), "Root", organ_colors[2])
+    legend.SetEntry(1, vtk.vtkPolyData(), "Stem", organ_colors[3])
+    legend.SetEntry(2, vtk.vtkPolyData(), "Leaf", organ_colors[4])
+    legend.GetPositionCoordinate().SetCoordinateSystemToNormalizedViewport()
+    legend.GetPositionCoordinate().SetValue(0.8, 0.8)
+    legend.GetPosition2Coordinate().SetCoordinateSystemToNormalizedViewport()
+    legend.GetPosition2Coordinate().SetValue(0.2, 0.2)
+    renderer.AddActor(legend)
+
+    # Set up the camera for a fixed 2D view
+    camera = renderer.GetActiveCamera()
+    camera.ParallelProjectionOn()
+    
+    # Position camera to view entire plant
+    x_center = (x_min + x_max) / 2
+    z_center = (z_min + z_max) / 2
+    x_range = x_max - x_min
+    z_range = z_max - z_min
+    
+    camera.SetPosition(x_center, z_center, max(x_range, z_range))
+    camera.SetFocalPoint(x_center, z_center, 0)
+    camera.SetViewUp(0, 1, 0)
+    
+    # Adjust zoom to fit plant
+    camera.SetParallelScale(max(x_range, z_range) * 0.6)
+
+    # Disable mouse interaction
+    interactor.RemoveObservers('LeftButtonPressEvent')
+    interactor.RemoveObservers('MiddleButtonPressEvent')
+    interactor.RemoveObservers('RightButtonPressEvent')
+    interactor.RemoveObservers('MouseWheelForwardEvent')
+    interactor.RemoveObservers('MouseWheelBackwardEvent')
+
+    # Initialize the interactor and start the rendering loop
+    interactor.Initialize()
+    renderWindow.Render()
+    interactor.Start()
 
 def plot_leaf(leaf):
     """
